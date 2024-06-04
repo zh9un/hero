@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Beacon</string>
+    <string name="location_format">Location: (%1$.2f, %2$.2f)\nMoved Distance: %3$.2f meters\nMoved Direction: %4$.2f degrees</string>
+</resources>
