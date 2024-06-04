@@ -10,6 +10,7 @@ import android.bluetooth.le.ScanSettings;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
@@ -40,8 +41,6 @@ public class MainActivity extends AppCompatActivity {
     private final BeaconInfo beacon3 = new BeaconInfo(new Point(2.5, 5), -59, "C3:00:00:19:2F:34"); // 세 번째 비콘의 MAC 주소 입력
 
     private final Map<String, BeaconInfo> beaconsMap = new HashMap<>();
-    private final Map<String, List<Integer>> rssiValuesMap = new HashMap<>();
-    private final Map<String, KalmanFilter> kalmanFilters = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -149,22 +148,16 @@ public class MainActivity extends AppCompatActivity {
 
             Log.d(TAG, "Found beacon: " + deviceAddress + " with RSSI: " + rssi);
 
-            // RSSI 값 업데이트
-            updateRSSI(deviceAddress, rssi);
-
             // 비콘의 MAC 주소를 기반으로 거리 계산
             BeaconInfo beaconInfo = beaconsMap.get(deviceAddress);
             if (beaconInfo != null) {
-                double averageRssi = getFilteredRSSI(deviceAddress, rssi);
-                if (averageRssi != -1) {
-                    double distance = calculateDistance(beaconInfo.txPower, averageRssi);
-                    beaconInfo.distance = distance;
-                    beaconInfo.rssi = (int) averageRssi;
+                double distance = calculateDistance(beaconInfo.txPower, rssi);
+                beaconInfo.distance = distance;
+                beaconInfo.rssi = rssi;
 
-                    Log.d(TAG, "Updated beacon: " + deviceAddress + " distance: " + distance);
-                    // 모든 비콘의 거리와 RSSI 정보를 UI에 업데이트
-                    updateUI();
-                }
+                Log.d(TAG, "Updated beacon: " + deviceAddress + " distance: " + distance);
+                // 모든 비콘의 거리와 RSSI 정보를 UI에 업데이트
+                updateUI();
             }
         }
 
@@ -174,22 +167,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Scan failed with error: " + errorCode);
         }
     };
-
-    private void updateRSSI(String macAddress, int rssi) {
-        List<Integer> rssiValues = rssiValuesMap.getOrDefault(macAddress, new ArrayList<>());
-        rssiValues.add(rssi);
-        if (rssiValues.size() > 5) { // 최근 5개의 값만 사용
-            rssiValues.remove(0);
-        }
-        rssiValuesMap.put(macAddress, rssiValues);
-    }
-
-    private double getFilteredRSSI(String macAddress, int rssi) {
-        KalmanFilter filter = kalmanFilters.getOrDefault(macAddress, new KalmanFilter());
-        double filteredRssi = filter.filter(rssi);
-        kalmanFilters.put(macAddress, filter);
-        return filteredRssi;
-    }
 
     private void updateUI() {
         StringBuilder debugInfo = new StringBuilder();
@@ -287,20 +264,6 @@ public class MainActivity extends AppCompatActivity {
             this.position = position;
             this.txPower = txPower;
             this.macAddress = macAddress;
-        }
-    }
-
-    class KalmanFilter {
-        private double Q = 0.0001;
-        private double R = 0.1;
-        private double P = 1, X = 0, K;
-
-        public double filter(double measurement) {
-            P = P + Q;
-            K = P / (P + R);
-            X = X + K * (measurement - X);
-            P = (1 - K) * P;
-            return X;
         }
     }
 }
