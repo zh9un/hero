@@ -10,7 +10,6 @@ import android.bluetooth.le.ScanSettings;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
@@ -36,9 +35,12 @@ public class MainActivity extends AppCompatActivity {
     private Point previousPosition = new Point(0, 0); // 초기 위치
 
     // 비콘들의 MAC 주소와 위치, txPower 설정
-    private final BeaconInfo beacon1 = new BeaconInfo(new Point(0, 0), -59, "C3:00:00:19:2F:4B");
-    private final BeaconInfo beacon2 = new BeaconInfo(new Point(5, 0), -59, "C3:00:00:19:2F:33"); // 두 번째 비콘의 MAC 주소 입력
-    private final BeaconInfo beacon3 = new BeaconInfo(new Point(2.5, 5), -59, "C3:00:00:19:2F:34"); // 세 번째 비콘의 MAC 주소 입력
+    // 비콘 스펙을 기반으로 txPower 값을 설정할 때는 Measured Power 값을 사용
+    // Measured Power : 비콘으로부터 1미터 거리에서 측정된 RSSI 값
+    // 비콘으로부터의 거리를 계산할 때 필요하기 때문에 Measured power 값 사용
+    private final BeaconInfo beacon1 = new BeaconInfo(new Point(0, 0), -59, 0, "C3:00:00:19:2F:4B");
+    private final BeaconInfo beacon2 = new BeaconInfo(new Point(5, 0), -59, 0, "C3:00:00:19:2F:33"); // 두 번째 비콘의 MAC 주소 입력
+    private final BeaconInfo beacon3 = new BeaconInfo(new Point(2.5, 5), -59, 0, "C3:00:00:19:2F:34"); // 세 번째 비콘의 MAC 주소 입력
 
     private final Map<String, BeaconInfo> beaconsMap = new HashMap<>();
 
@@ -152,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
             // 비콘의 MAC 주소를 기반으로 거리 계산
             BeaconInfo beaconInfo = beaconsMap.get(deviceAddress);
             if (beaconInfo != null) {
-                double distance = calculateDistance(beaconInfo.txPower, rssi); //calculateDistance: RSSI 값을 기반으로 거리 계산.
+                double distance = calculateDistance(beaconInfo.measuredPower, rssi); //calculateDistance: RSSI 값을 기반으로 거리 계산.
                 beaconInfo.distance = distance;
                 beaconInfo.rssi = rssi;
 
@@ -199,17 +201,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public double calculateDistance(int txPower, double rssi) {
+    public double calculateDistance(int measuredPower, double rssi) {
         if (rssi == 0) {
             return -1.0; // 신호가 없으면 거리 측정 불가
         }
-        //txPower와 RSSI는 부호가 반대이므로, 절대값을 사용하여 비율 계산
-        double ratio = Math.abs(rssi) * 1.0 / Math.abs(txPower);
+        // measuredPower와 RSSI는 부호가 반대이므로, 절대값을 사용하여 비율 계산
+        double ratio = Math.abs(rssi) * 1.0 / Math.abs(measuredPower);
         double distance;
         if (ratio < 1.0) {
             distance = Math.pow(ratio, 10);
         } else {
-            //
             distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111;
         }
         Log.d(TAG, "Calculated distance: " + distance);
@@ -265,13 +266,15 @@ public class MainActivity extends AppCompatActivity {
 
     static class BeaconInfo {
         Point position;
-        int txPower;
+        int measuredPower; // 1미터 거리에서의 RSSI 값
+        int txPower; // 비콘의 송신 출력 값
         String macAddress;
         double distance = -1; // 거리 초기값
         int rssi; // RSSI 값
 
-        public BeaconInfo(Point position, int txPower, String macAddress) {
+        public BeaconInfo(Point position, int measuredPower, int txPower, String macAddress) {
             this.position = position;
+            this.measuredPower = measuredPower;
             this.txPower = txPower;
             this.macAddress = macAddress;
         }
