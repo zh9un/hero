@@ -27,12 +27,12 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 1;
-    private static final int REQUEST_ENABLE_BT = 2;
+    private static final int REQUEST_ENABLE_BT = 2; //블루투스 활성화 요청 코드
     private static final String TAG = "MainActivity";
 
-    private BluetoothLeScanner bluetoothLeScanner;
-    private TextView locationTextView;
-    private TextView debugTextView;
+    private BluetoothLeScanner bluetoothLeScanner; //블루투스 LE 스캐너 객체 (null 초기화)
+    private TextView locationTextView; //사용자 위치 정보를 표시하는 텍스트뷰
+    private TextView debugTextView; //디버그 정보를 표시하는 텍스트뷰
     private Point previousPosition = new Point(0, 0); // 초기 위치
 
     // 비콘들의 MAC 주소와 위치, txPower 설정
@@ -65,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -77,8 +78,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void initBluetoothScanner() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+    private void initBluetoothScanner() { //블루투스 스캐너를 초기화
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) //위치 권한 확인
                 != PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "Location permission not granted for Bluetooth scanning");
             return;
@@ -114,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startScanning() {
+    private void startScanning() { //비콘 스캔 시작
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "Location permission not granted for Bluetooth scanning");
@@ -151,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
             // 비콘의 MAC 주소를 기반으로 거리 계산
             BeaconInfo beaconInfo = beaconsMap.get(deviceAddress);
             if (beaconInfo != null) {
-                double distance = calculateDistance(beaconInfo.txPower, rssi);
+                double distance = calculateDistance(beaconInfo.txPower, rssi); //calculateDistance: RSSI 값을 기반으로 거리 계산.
                 beaconInfo.distance = distance;
                 beaconInfo.rssi = rssi;
 
@@ -202,18 +203,26 @@ public class MainActivity extends AppCompatActivity {
         if (rssi == 0) {
             return -1.0; // 신호가 없으면 거리 측정 불가
         }
-        // 여기서 txPower와 RSSI는 부호가 반대이므로, 절대값을 사용하여 비율을 계산합니다.
+        //txPower와 RSSI는 부호가 반대이므로, 절대값을 사용하여 비율 계산
         double ratio = Math.abs(rssi) * 1.0 / Math.abs(txPower);
         double distance;
         if (ratio < 1.0) {
             distance = Math.pow(ratio, 10);
         } else {
+            //
             distance = (0.89976) * Math.pow(ratio, 7.7095) + 0.111;
         }
         Log.d(TAG, "Calculated distance: " + distance);
         return distance;
     }
 
+    // trillateration 함수 : 세 개의 비콘으로부터 측정된 거리 정보를 이용하여 사용자의 위치를 삼각 측량하는 알고리즘
+    //p1, p2, p3: 세 개의 비콘의 위치 (Point 클래스)
+    //d1, d2, d3: 각 비콘과 사용자 간의 거리 (미터 단위)
+    //Point: 사용자의 위치 (Point 클래스)
+    //A, B, C, D, E, F 변수: 삼각 측량 방정식의 계수
+    //계산에는 비콘의 위치 정보와 거리 정보가 사용
+    //x, y 변수 : 사용자의 위치 좌표 (x, y)
     public Point trilateration(Point p1, double d1, Point p2, double d2, Point p3, double d3) {
         double A = 2 * p2.x - 2 * p1.x;
         double B = 2 * p2.y - 2 * p1.y;
@@ -226,6 +235,7 @@ public class MainActivity extends AppCompatActivity {
         double y = (C * D - A * F) / (B * D - A * E);
 
         // Add a fallback mechanism in case of NaN values
+        //NaN 값이 나오면 세 비콘의 위치 정보를 평균하여 대략적인 사용자 위치를 추정
         if (Double.isNaN(x) || Double.isNaN(y)) {
             Log.d(TAG, "Trilateration resulted in NaN coordinates, using fallback position");
             x = (p1.x + p2.x + p3.x) / 3;
